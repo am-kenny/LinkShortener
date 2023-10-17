@@ -1,0 +1,41 @@
+# Use root/example as user/password credentials
+version: '3.8'
+
+services:
+  app:
+    container_name: FastAPI_app
+    build: .
+    ports:
+      - "80:80"
+    depends_on:
+      - mongo
+    environment:
+      - MONGO_DB_HOST=mongodb://root:example@mongo_host:27017/
+
+
+  mongo:
+    image: mongo
+    container_name: mongodb
+    restart: always
+    hostname: mongo_host
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: example
+      MONGO_INITDB_DATABASE: link_shortener_db
+    ports:
+      - "27017:27017"
+    volumes:
+      - ./mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+
+  mongo-express:
+    image: mongo-express
+    restart: always
+    ports:
+      - "8081:8081"
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: root
+      ME_CONFIG_MONGODB_ADMINPASSWORD: example
+      ME_CONFIG_MONGODB_URL: mongodb://root:example@mongo_host:27017/
+    depends_on:
+      - mongo
+
