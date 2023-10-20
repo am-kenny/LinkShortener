@@ -4,7 +4,7 @@ import uvicorn
 from fastapi import FastAPI, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from app.utils import add_short_link, get_long_link, update_short_link
+from app.utils import add_short_link, get_long_link, update_short_link, add_redirect
 
 app = FastAPI()
 
@@ -63,6 +63,7 @@ async def create_link(link: Annotated[str, Form()], short_code: Optional[str] = 
 @app.get("/{url_code}")
 async def short_to_long(url_code: str):
     long_url = await get_long_link(url_code)
+    await add_redirect(url_code)
     if long_url:
         return RedirectResponse(long_url)
 
