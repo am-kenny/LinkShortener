@@ -1,15 +1,16 @@
+import os
+
 from telebot.async_telebot import AsyncTeleBot
 
 import utils
 import keyboards as kb
 
-token = '6614730088:AAF5LdKF60hym4MLRSegm9Ps-_hkq1q7Hy0'
+token = os.environ.get("TELEGRAM_API_TOKEN", '')
 bot = AsyncTeleBot(token)
 
 conversation_states = {}
 
 
-# Handle '/start' and '/help'
 @bot.message_handler(commands=['start'])
 async def start(message):
     text = f"""\

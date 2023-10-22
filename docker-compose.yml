@@ -14,7 +14,6 @@ services:
     command: uvicorn app.main:app --host 0.0.0.0
     volumes:
       - .:/app
-#    does not work
 
   tg:
     container_name: telegram_bot
@@ -23,6 +22,8 @@ services:
       - mongo
     environment:
       - MONGO_DB_HOST=mongodb://root:example@mongo_host:27017/
+    env_file:
+      - .env
     command:
       - python
       - app/bot.py

@@ -70,7 +70,7 @@ async def add_user(user_data):
 
 async def add_redirect(short_url):
     url_data = await db.links.find_one({"short_url": short_url})
-    if url_data:
+    if url_data and url_data.get('user_id'):
         await db.redirects.insert_one({
             'short_url': short_url,
             'owner': url_data['user_id']
