@@ -8,12 +8,14 @@ from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
 
 from app.models import UserInDB, User
 from app.utils import add_short_link, get_long_link, update_short_link, add_redirect, get_user_by_token, \
-    get_user_by_username
+    get_user_by_username, check_url_master
 
 app = FastAPI()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
-
+"""
+ID користувача використовується як токен (як на занятті) і потребується аутентифікація для створення та редагування посилань 
+"""
 @app.get("/")
 async def root():
     response_content = """
@@ -43,26 +45,7 @@ async def root():
     return HTMLResponse(content=response_content, status_code=200)
 
 
-@app.post("/")
-async def create_link(link: Annotated[str, Form()], short_code: Optional[str] = Form(None)):
-    short_url = await add_short_link(link, short_code)
-    if not short_url:
 
-        return {'error': 'short url already exists'}
-
-    response_content = f"""
-    <html>
-        <head>
-            <title>Link is ready!</title>
-        </head>
-        <body>
-            <p>Your link:</p>
-            <a href="{app.url_path_for('short_to_long', url_code=short_url)}" target="_blank">{short_url}</a>
-        </body>
-    </html>
-    """
-
-    return HTMLResponse(content=response_content, status_code=200)
 
 
 
@@ -132,12 +115,59 @@ async def read_users_me(
 
 
 
+@app.post("/")
+async def create_link(
+
+        link: Annotated[str, Form()],
+        current_user: Annotated[User, Depends(get_current_active_user)],
+        short_code: Optional[str] = Form(None)):
+    user_dict = await get_user_by_username(current_user.username)
+    token = user_dict["_id"]
+    short_url = await add_short_link(link, short_code, token=token)
+    if not short_url:
+
+        return {'error': 'short url already exists'}
+
+    response_content = f"""
+    <html>
+        <head>
+            <title>Link is ready!</title>
+        </head>
+        <body>
+            <p>Your link:</p>
+            <a href="{app.url_path_for('short_to_long', url_code=short_url)}" target="_blank">{short_url}</a>
+        </body>
+    </html>
+    """
+
+    return HTMLResponse(content=response_content, status_code=200)
 
 
+@app.post("/update")
+async def update_short(url_code: Annotated[str, Form()],
+                       new_long_url: Annotated[str, Form()],
+                       current_user: Annotated[User, Depends(get_current_active_user)]):
+    user_dict = await get_user_by_username(current_user.username)
+    token = user_dict["_id"]
+    isMaster = check_url_master(url_code, token)
+    if isMaster:
+        short_url = await update_short_link(url_code, new_long_url)
+        if short_url:
+            response_content = f"""
+            <html>
+                <head>
+                    <title>Link is ready!</title>
+                </head>
+                <body>
+                    <p>Your link:</p>
+                    <a href="{app.url_path_for('short_to_long', url_code=short_url)}" target="_blank">{short_url}</a>
+                </body>
+            </html>
+            """
 
+            return HTMLResponse(content=response_content, status_code=200)
 
-
-
+    return {'error': 'nothing modified'}
 
 
 @app.get("/{url_code}")
@@ -150,26 +180,5 @@ async def short_to_long(url_code: str):
     return 404
 
 
-@app.post("/update")
-async def update_short(url_code: Annotated[str, Form()], new_long_url: Annotated[str, Form()]):
-    short_url = await update_short_link(url_code, new_long_url)
-    if short_url:
-        response_content = f"""
-        <html>
-            <head>
-                <title>Link is ready!</title>
-            </head>
-            <body>
-                <p>Your link:</p>
-                <a href="{app.url_path_for('short_to_long', url_code=short_url)}" target="_blank">{short_url}</a>
-            </body>
-        </html>
-        """
-
-        return HTMLResponse(content=response_content, status_code=200)
-
-    return {'error': 'nothing modified'}
-
-
 if __name__ == "__main__":
-    uvicorn.run("app.main:app", host="localhost", port=8009, log_level="info")
+    uvicorn.run("app.main:app", host="localhost", port=8009, log_level="debug")

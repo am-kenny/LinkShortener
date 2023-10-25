@@ -3,24 +3,29 @@ from uuid import uuid4
 
 import bson
 import motor.motor_asyncio
-from pydantic import BaseModel
 
 mongo_host = os.environ.get('MONGO_DB_HOST', 'mongodb://root:example@localhost:27017/')
 client = motor.motor_asyncio.AsyncIOMotorClient(mongo_host)
 db = client.link_shortener_db
 
 
-async def add_short_link(long_url: str, short_url: str = None, user_id=None):
+async def add_short_link(long_url: str, short_url: str = None, tg_user_id=None, token=None):
     isShortExists = await db.links.find_one({"short_url": short_url})
     if short_url and isShortExists:
         return None
     if not short_url:
         short_url = str(uuid4())
-    if user_id:
+    if tg_user_id:
         data = {
             "long_url": long_url,
             "short_url": short_url,
-            "user_id": user_id
+            "user_id": tg_user_id
+        }
+    elif token:
+        data = {
+            "long_url": long_url,
+            "short_url": short_url,
+            "token": token
         }
     else:
         data = {
@@ -45,6 +50,14 @@ async def update_short_link(short_url: str, new_long_url: str):
         new_long_url = {"long_url": new_long_url}
         await db.links.update_one({"_id": original_long_url["_id"]}, {"$set": new_long_url})
         return short_url
+    else:
+        return None
+
+
+async def check_url_master(short_url: str, token: str):
+    url_data = await db.links.find_one({"short_url": short_url})
+    if url_data:
+        return url_data["token"] == token
     else:
         return None
 
@@ -91,4 +104,4 @@ async def get_user_by_username(username: str):
     user_dict = await db.users.find_one({"username": username})
     if user_dict:
         return user_dict
-    return None
+
