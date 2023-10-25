@@ -1,7 +1,9 @@
 import os
 from uuid import uuid4
 
+import bson
 import motor.motor_asyncio
+from pydantic import BaseModel
 
 mongo_host = os.environ.get('MONGO_DB_HOST', 'mongodb://root:example@localhost:27017/')
 client = motor.motor_asyncio.AsyncIOMotorClient(mongo_host)
@@ -48,7 +50,7 @@ async def update_short_link(short_url: str, new_long_url: str):
 
 
 async def add_user(user_data):
-    isUser = await db.users.find_one({"user_id": user_data.id})
+    isUser = await db.telegram_users.find_one({"user_id": user_data.id})
     if not isUser:
         user_dict = {
             'user_id': user_data.id,
@@ -57,7 +59,7 @@ async def add_user(user_data):
             'username': user_data.username,
             'language_code': user_data.language_code
         }
-        await db.users.insert_one(user_dict)
+        await db.telegram_users.insert_one(user_dict)
 
 
 # async def get_all_user_links(user_id): TODO
@@ -77,3 +79,16 @@ async def add_redirect(short_url):
         })
     else:
         print("error")
+
+
+async def get_user_by_token(token: str):
+    user_dict = await db.users.find_one({"_id": bson.ObjectId(token)})
+    if user_dict:
+        return user_dict
+
+
+async def get_user_by_username(username: str):
+    user_dict = await db.users.find_one({"username": username})
+    if user_dict:
+        return user_dict
+    return None

@@ -1,12 +1,17 @@
+from hashlib import md5
 from typing import Annotated, Optional
 
 import uvicorn
-from fastapi import FastAPI, Form
+from fastapi import FastAPI, Form, Depends, HTTPException, status
 from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
 
-from app.utils import add_short_link, get_long_link, update_short_link, add_redirect
+from app.models import UserInDB, User
+from app.utils import add_short_link, get_long_link, update_short_link, add_redirect, get_user_by_token, \
+    get_user_by_username
 
 app = FastAPI()
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 
 @app.get("/")
@@ -58,6 +63,81 @@ async def create_link(link: Annotated[str, Form()], short_code: Optional[str] = 
     """
 
     return HTMLResponse(content=response_content, status_code=200)
+
+
+
+
+
+
+
+
+
+
+
+def hash_password(password: str):
+    return md5(password.encode('utf-8')).hexdigest()
+
+
+async def fake_decode_token(token):
+    # This doesn't provide any security at all
+    # Check the next version
+    user_dict = await get_user_by_token(token)
+    if user_dict:
+        return UserInDB(**user_dict)
+    return None
+
+
+async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)]):
+    user = await fake_decode_token(token)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return user
+
+
+async def get_current_active_user(
+    current_user: Annotated[User, Depends(get_current_user)]
+):
+    if current_user.disabled:
+        raise HTTPException(status_code=400, detail="Inactive user")
+    return current_user
+
+
+@app.post("/token")
+async def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()]):
+    user_dict = await get_user_by_username(form_data.username)
+    if not user_dict:
+        raise HTTPException(status_code=400, detail="Incorrect username or password")
+    user = UserInDB(**user_dict)
+    hashed_password = hash_password(form_data.password)
+    if not hashed_password == user.hashed_password:
+        raise HTTPException(status_code=400, detail="Incorrect username or password")
+    access_token = str(user_dict["_id"])
+
+    return {"access_token": access_token, "token_type": "bearer"}
+
+
+@app.get("/users/me")
+async def read_users_me(
+    current_user: Annotated[User, Depends(get_current_active_user)]
+):
+    return current_user
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 @app.get("/{url_code}")
