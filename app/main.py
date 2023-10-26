@@ -16,6 +16,8 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 """
 ID користувача використовується як токен (як на занятті) і потребується аутентифікація для створення та редагування посилань 
 """
+
+
 @app.get("/")
 async def root():
     response_content = """
@@ -45,18 +47,6 @@ async def root():
     return HTMLResponse(content=response_content, status_code=200)
 
 
-
-
-
-
-
-
-
-
-
-
-
-
 def hash_password(password: str):
     return md5(password.encode('utf-8')).hexdigest()
 
@@ -70,7 +60,9 @@ async def fake_decode_token(token):
     return None
 
 
-async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)]):
+async def get_current_user(
+        token: Annotated[str, Depends(oauth2_scheme)]
+):
     user = await fake_decode_token(token)
     if not user:
         raise HTTPException(
@@ -90,7 +82,9 @@ async def get_current_active_user(
 
 
 @app.post("/token")
-async def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()]):
+async def login(
+        form_data: Annotated[OAuth2PasswordRequestForm, Depends()]
+):
     user_dict = await get_user_by_username(form_data.username)
     if not user_dict:
         raise HTTPException(status_code=400, detail="Incorrect username or password")
@@ -110,17 +104,12 @@ async def read_users_me(
     return current_user
 
 
-
-
-
-
-
 @app.post("/")
 async def create_link(
-
         link: Annotated[str, Form()],
         current_user: Annotated[User, Depends(get_current_active_user)],
-        short_code: Optional[str] = Form(None)):
+        short_code: Optional[str] = Form(None)
+):
     user_dict = await get_user_by_username(current_user.username)
     token = user_dict["_id"]
     short_url = await add_short_link(link, short_code, token=token)
